@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Wire up `node-pg-migrate` for manual schema migrations, replacing `backend/schema.sql` with a versioned migration file.
+**Goal:** Wire up `node-pg-migrate` for manual schema migrations using plain SQL files, replacing `backend/schema.sql` with a versioned migration file.
 
-**Architecture:** Add `node-pg-migrate` as a devDependency with three npm scripts (`migrate:up`, `migrate:down`, `migrate:create`). Migration files live in `backend/migrations/` using `.cjs` extension (required because `backend/package.json` sets `"type": "module"`). The first migration converts the existing `schema.sql` into a versioned file.
+**Architecture:** Add `node-pg-migrate` as a devDependency with three npm scripts (`migrate:up`, `migrate:down`, `migrate:create`). Migration files live in `backend/migrations/` as plain `.sql` files with `-- Up Migration` / `-- Down Migration` comment markers. No JavaScript in migration files.
 
-**Tech Stack:** `node-pg-migrate`, PostgreSQL, Node.js (CommonJS `.cjs` migration files inside an ESM package)
+**Tech Stack:** `node-pg-migrate`, PostgreSQL, plain SQL migration files
 
 ---
 
@@ -17,7 +17,7 @@
 | Action | Path | Responsibility |
 |---|---|---|
 | Modify | `backend/package.json` | Add `node-pg-migrate` devDependency + 3 scripts |
-| Create | `backend/migrations/20260313000000_create_items.cjs` | Initial migration: creates `items` table |
+| Create | `backend/migrations/20260313000000_create_items.sql` | Initial migration: creates `items` table |
 | Delete | `backend/schema.sql` | Superseded by migrations |
 
 ---
@@ -41,7 +41,7 @@ Replace the current contents with:
     "start": "node src/index.js",
     "migrate:up": "node-pg-migrate up --schema $DB_SCHEMA --migrations-dir migrations",
     "migrate:down": "node-pg-migrate down --schema $DB_SCHEMA --migrations-dir migrations",
-    "migrate:create": "node-pg-migrate create --schema $DB_SCHEMA --migrations-dir migrations --migration-file-language cjs"
+    "migrate:create": "node-pg-migrate create --schema $DB_SCHEMA --migrations-dir migrations --migration-file-language sql"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -84,24 +84,22 @@ git commit -m "chore: add node-pg-migrate devDependency and scripts"
 ### Task 2: Create the initial migration
 
 **Files:**
-- Create: `backend/migrations/20260313000000_create_items.cjs`
+- Create: `backend/migrations/20260313000000_create_items.sql`
 
 - [ ] **Step 1: Create the migrations directory and first migration file**
 
-Create `backend/migrations/20260313000000_create_items.cjs` with these contents:
+Create `backend/migrations/20260313000000_create_items.sql` with these contents:
 
-```js
-exports.up = (pgm) => {
-  pgm.createTable('items', {
-    id: { type: 'serial', primaryKey: true },
-    name: { type: 'text', notNull: true },
-    created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  });
-};
+```sql
+-- Up Migration
+CREATE TABLE items (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-exports.down = (pgm) => {
-  pgm.dropTable('items');
-};
+-- Down Migration
+DROP TABLE items;
 ```
 
 - [ ] **Step 2: Run migrate:up to verify the migration applies cleanly**
@@ -156,7 +154,7 @@ Expected: migration applies again cleanly. Database is back to having the `items
 
 ```bash
 git add backend/migrations/
-git commit -m "feat: add initial migration for items table"
+git commit -m "feat: add initial SQL migration for items table"
 ```
 
 ---
@@ -174,20 +172,18 @@ git rm backend/schema.sql
 
 - [ ] **Step 2: Update README.md to reflect the change**
 
-In `README.md`, find the project structure section and update the backend description. Replace any mention of `schema.sql` with a reference to `migrations/`:
+In `README.md`, find the project structure section and update the backend entry. Replace `schema.sql` with `migrations/`:
 
-```markdown
-├── backend/
-│   ├── src/
-│   │   ├── db.js          # Schema-aware dual-mode connection
-│   │   ├── index.js       # Express entry point
-│   │   └── routes/
-│   │       └── items.js   # Starter CRUD route — rename or replace
-│   ├── migrations/        # Database migrations (node-pg-migrate)
-│   └── Dockerfile
-```
+    ├── backend/
+    │   ├── src/
+    │   │   ├── db.js          # Schema-aware dual-mode connection
+    │   │   ├── index.js       # Express entry point
+    │   │   └── routes/
+    │   │       └── items.js   # Starter CRUD route — rename or replace
+    │   ├── migrations/        # Database migrations (node-pg-migrate, plain SQL)
+    │   └── Dockerfile
 
-Also update the "Local development" section to mention running `npm run migrate:up` after container startup. The updated section should read:
+Also update the "Local development" section to mention running `npm run migrate:up` after container startup:
 
     ### Option A: Dev Container (recommended)
 
@@ -224,7 +220,7 @@ cd backend && npm run migrate:up
 ```bash
 cd backend
 npm run migrate:create -- your-migration-name
-# Edit the generated file in backend/migrations/
+# Edit the generated .sql file in backend/migrations/
 npm run migrate:up
 ```
 
@@ -237,6 +233,6 @@ cd backend && npm run migrate:down
 Start the Cloud SQL Auth Proxy locally, then:
 ```bash
 export DATABASE_URL=postgres://<user>:<password>@localhost:5432/<db-name>
-export DB_SCHEMA=todo2
+export DB_SCHEMA=<your-schema>
 cd backend && npm run migrate:up
 ```
