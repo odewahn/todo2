@@ -4,8 +4,7 @@
   "service": "app",
   "workspaceFolder": "/workspace",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
-    "ghcr.io/devcontainers/features/google-cloud-cli:1": {}
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
   },
   "postCreateCommand": "cd backend && npm install && cd ../frontend && npm install",
   "forwardPorts": [3001, 5173, 5432],
